@@ -23,12 +23,44 @@ export const INTENTS = [
   'CRYPTO_PRICE'
 ];
 
+// A validator that times out waiting on us records a failure; an explicit
+// error at least resolves the request and frees the connection. So every
+// handler is capped: whatever happens upstream, this miner answers.
+const REQUEST_DEADLINE_MS = Number(process.env.REQUEST_DEADLINE_MS || 12000);
+
+function withDeadline(handler, intent) {
+  return async function deadlineWrapped(req, reply) {
+    let timer;
+    const deadline = new Promise((resolve) => {
+      timer = setTimeout(() => {
+        reply.code(504);
+        resolve({
+          ok: false,
+          status: 'error',
+          intent,
+          error: `Upstream sources did not answer within ${REQUEST_DEADLINE_MS}ms.`,
+          timestamp: new Date().toISOString()
+        });
+      }, REQUEST_DEADLINE_MS);
+    });
+    try {
+      return await Promise.race([handler(req, reply), deadline]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+
 export function buildServer() {
-  const app = Fastify({ logger: process.env.NODE_ENV !== 'test' });
+  const app = Fastify({
+    logger: process.env.NODE_ENV !== 'test',
+    // belt and braces: drop a connection the app somehow never answers
+    requestTimeout: Number(process.env.FASTIFY_REQUEST_TIMEOUT_MS || 20000)
+  });
 
   app.get('/', async () => ({
     name: 'telegraph-onchain-miner',
-    version: '1.1.0',
+    version: '2.0.0',
     intents: INTENTS,
     chains: SUPPORTED_CHAIN_KEYS,
     endpoints: {
@@ -54,14 +86,14 @@ export function buildServer() {
     intents: INTENTS.length
   }));
 
-  app.get('/v1/ask', ask);
-  app.post('/v1/ask', ask);
-  app.get('/v1/gas-price', gasPrice);
-  app.get('/v1/wallet-balance', walletBalance);
-  app.get('/v1/token-holders', tokenHolders);
-  app.get('/v1/tvl', tvl);
-  app.get('/v1/tx', txLookup);
-  app.get('/v1/price', cryptoPrice);
+  app.get('/v1/ask', withDeadline(ask, null));
+  app.post('/v1/ask', withDeadline(ask, null));
+  app.get('/v1/gas-price', withDeadline(gasPrice, 'GAS_PRICE'));
+  app.get('/v1/wallet-balance', withDeadline(walletBalance, 'WALLET_BALANCE_CHECK'));
+  app.get('/v1/token-holders', withDeadline(tokenHolders, 'TOKEN_HOLDER_COUNT'));
+  app.get('/v1/tvl', withDeadline(tvl, 'TVL_LOOKUP'));
+  app.get('/v1/tx', withDeadline(txLookup, 'ONCHAIN_TX_LOOKUP'));
+  app.get('/v1/price', withDeadline(cryptoPrice, 'CRYPTO_PRICE'));
 
   return app;
 }

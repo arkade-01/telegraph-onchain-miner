@@ -220,3 +220,37 @@ test('no API key reaches samples or error text', async () => {
     }
   );
 });
+
+test('losing hedge requests are aborted once one endpoint wins', async () => {
+  // A request that never resolves on its own; it can only end by being aborted.
+  const aborted = [];
+  rpc.setFetch((url, opts) => {
+    const host = new URL(url).host;
+    if (host === 'fast.example') {
+      return Promise.resolve({
+        ok: true, status: 200,
+        json: async () => ({ jsonrpc: '2.0', id: 1, result: '0x3b9aca00' })
+      });
+    }
+    return new Promise((_, reject) => {
+      opts.signal?.addEventListener('abort', () => {
+        aborted.push(host);
+        reject(new Error('aborted'));
+      });
+    });
+  });
+
+  await rpc.rpcMedianBigInt(
+    ['https://fast.example', 'https://slow.example', 'https://dead.example'],
+    'eth_gasPrice',
+    [],
+    { softDeadlineMs: 60, lastResortMs: 120 }
+  );
+
+  // give the abort listeners a tick to run
+  await new Promise((r) => setTimeout(r, 50));
+  assert.ok(
+    aborted.includes('slow.example') && aborted.includes('dead.example'),
+    `orphaned requests must be cancelled, got: ${JSON.stringify(aborted)}`
+  );
+});

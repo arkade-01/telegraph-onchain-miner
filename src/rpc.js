@@ -46,8 +46,7 @@ export function redactUrl(url) {
 
 const DEFAULT_TIMEOUT_MS = Number(process.env.RPC_TIMEOUT_MS || 8000);
 
-async function rpcCallOne(url, method, params, timeoutMs = DEFAULT_TIMEOUT_MS) {
-  const ctrl = new AbortController();
+async function rpcCallOne(url, method, params, timeoutMs = DEFAULT_TIMEOUT_MS, ctrl = new AbortController()) {
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetchImpl(url, {
@@ -90,10 +89,23 @@ export async function rpcFirst(rpcs, method, params, opts = {}) {
   return new Promise((resolve, reject) => {
     const errors = [];
     const timers = [];
+    const controllers = [];
     let done = false;
     let settled = 0;
 
-    const clearAll = () => timers.forEach(clearTimeout);
+    // Cancel the losing hedges. Without this, every request we raced keeps its
+    // socket open until its own timeout; across a busy miner those orphaned
+    // requests exhaust the connection pool and later requests simply hang.
+    const clearAll = () => {
+      timers.forEach(clearTimeout);
+      controllers.forEach((c) => {
+        try {
+          c.abort();
+        } catch {
+          /* already settled */
+        }
+      });
+    };
     const failIfAllSettled = () => {
       if (!done && settled >= targets.length) {
         done = true;
@@ -106,7 +118,9 @@ export async function rpcFirst(rpcs, method, params, opts = {}) {
       timers.push(
         setTimeout(() => {
           if (done) return;
-          rpcCallOne(url, method, params, timeoutMs)
+          const ctrl = new AbortController();
+          controllers.push(ctrl);
+          rpcCallOne(url, method, params, timeoutMs, ctrl)
             .then((result) => {
               if (done) return;
               done = true;
@@ -151,6 +165,8 @@ export async function rpcMedianBigInt(rpcs, method, params, opts = {}) {
   const results = [];
   const errors = [];
 
+  const controllers = targets.map(() => new AbortController());
+
   return new Promise((resolve, reject) => {
     let done = false;
     let outstanding = targets.length;
@@ -160,6 +176,15 @@ export async function rpcMedianBigInt(rpcs, method, params, opts = {}) {
       done = true;
       clearTimeout(timer);
       clearTimeout(lastResort);
+      // Stop the endpoints we are no longer waiting on, so their sockets are
+      // released instead of lingering until their own timeout.
+      controllers.forEach((c) => {
+        try {
+          c.abort();
+        } catch {
+          /* already settled */
+        }
+      });
       if (results.length === 0) {
         reject(new Error(`All RPCs failed for ${method}: ${errors.join(' | ')}`));
         return;
@@ -182,8 +207,8 @@ export async function rpcMedianBigInt(rpcs, method, params, opts = {}) {
       if (results.length > 0) finish();
     }, lastResortMs);
 
-    for (const url of targets) {
-      rpcCallOne(url, method, params)
+    targets.forEach((url, i) => {
+      rpcCallOne(url, method, params, undefined, controllers[i])
         .then((r) => {
           results.push({ value: BigInt(r), url });
           if (results.length >= quorum) finish();
@@ -195,7 +220,7 @@ export async function rpcMedianBigInt(rpcs, method, params, opts = {}) {
           outstanding -= 1;
           if (outstanding === 0) finish(); // everyone reported; nothing left to wait for
         });
-    }
+    });
   });
 }
 

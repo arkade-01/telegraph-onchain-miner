@@ -17,14 +17,14 @@ if [ -z "${ALCHEMY_API_KEY:-}" ]; then
   echo
 fi
 
-if ! curl -sf -m 3 "$BASE/health" >/dev/null 2>&1; then
+if ! curl -sf -m 15 "$BASE/health" >/dev/null 2>&1; then
   echo "starting server..."
   node "$(dirname "$0")/../src/server.js" >/tmp/miner-smoke.log 2>&1 &
   SERVER_PID=$!
   STARTED=1
   for i in $(seq 1 20); do
     sleep 0.5
-    curl -sf -m 2 "$BASE/health" >/dev/null 2>&1 && break
+    curl -sf -m 5 "$BASE/health" >/dev/null 2>&1 && break
   done
 fi
 
