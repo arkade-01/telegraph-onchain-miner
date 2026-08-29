@@ -1,0 +1,354 @@
+# Telegraph miner descriptor — YAML Standard v1
+#
+# Structure mirrors the miners currently scoring well on the network
+# (patchsignal-cve 1.00, sarzops-transaction-risk 1.00, telegraph-chatbot 0.59):
+#   - kind: miner            (not "subnet")
+#   - UPPERCASE canonical intent names
+#   - per-endpoint `intents:` so the router knows which endpoint serves what
+#   - top-level input_schema / output_schema
+#   - signal_mapping WITHOUT a `type:` key
+#
+# `id` must be globally unused or the registration is REJECTED. 900 was checked
+# against the live /api/integrations list (106 miners) on 2026-08-29 — 901 and
+# 910 are taken, 900 is free. Re-check before registering.
+#
+# BEFORE REGISTERING:
+#   1. Set base_url to the deployed API URL.
+#   2. Re-run `npm run hash:yaml` — the on-chain hash must match this file byte
+#      for byte, so hash LAST, after every edit.
+
+version: "1"
+kind: miner
+id: 900
+slug: onchain-intel-miner
+protocol: generic
+name: OnChain Intel Miner
+description: >
+  Deterministic on-chain intelligence across 10 EVM networks (Ethereum, Base,
+  Polygon, BSC, Arbitrum, Optimism, Avalanche, Scroll, Linea, Gnosis). Answers
+  gas price, wallet balance, token holder count, DeFi TVL, transaction lookup
+  and crypto price questions — either from explicit parameters or from a
+  plain-language question. Every answer is number-first, states its sources,
+  and reports which verification checks passed. Gas prices are the median of an
+  RPC quorum and asset prices the median of three independent venues, so a
+  single stale or wicking source cannot move the answer.
+
+base_url: https://YOUR-DEPLOYMENT-URL.example.com
+
+auth:
+  type: none
+
+rate_limit_per_sec: 20
+cache_ttl_sec: 3
+circuit_threshold: 5
+circuit_cooldown_seconds: 30
+
+input_schema:
+  type: object
+  properties:
+    query:
+      type: string
+      description: Natural-language question, used when explicit parameters are not supplied.
+    chain:
+      type: string
+      description: "Chain name or id: ethereum, base, polygon, bsc, arbitrum, optimism, avalanche, scroll, linea, gnosis."
+    address:
+      type: string
+      description: 0x wallet address (40 hex characters).
+    token:
+      type: string
+      description: 0x ERC-20 contract address (40 hex characters).
+    hash:
+      type: string
+      description: 0x transaction hash (64 hex characters).
+    symbol:
+      type: string
+      description: Asset ticker, e.g. BTC, ETH, USDC.
+    protocol:
+      type: string
+      description: DeFi protocol slug, e.g. aave, uniswap, lido.
+
+output_schema:
+  type: object
+  properties:
+    ok:
+      type: boolean
+    status:
+      type: string
+    intent:
+      type: string
+    signal:
+      type: string
+      description: Concise number-first natural-language answer.
+    confidence:
+      type: number
+      minimum: 0
+      maximum: 1
+    checks:
+      type: object
+      description: Which verification checks passed (live, quorum, corroborated, canonical).
+    checks_passed:
+      type: integer
+    checks_total:
+      type: integer
+    resolved_via:
+      type: string
+      description: "params (explicit) or extracted (parsed from the question)."
+    sources:
+      type: array
+      items:
+        type: string
+    data:
+      type: object
+      description: Structured result; data.primary_value carries the headline figure.
+    as_of:
+      type: string
+  required:
+    - ok
+    - intent
+    - signal
+    - confidence
+    - sources
+    - data
+
+endpoints:
+  - path: /ask
+    external_path: /v1/ask
+    method: GET
+    description: >
+      Answer any supported on-chain question. Classifies the question into gas
+      price, wallet balance, token holder count, TVL, transaction lookup or
+      crypto price and returns the figure with a concise statement.
+    intents: [GAS_PRICE, WALLET_BALANCE_CHECK, TOKEN_HOLDER_COUNT, TVL_LOOKUP, ONCHAIN_TX_LOOKUP, CRYPTO_PRICE]
+    params:
+      query:
+        required:
+          - name: query
+            type: string
+            intents: ["*"]
+            description: The natural-language on-chain question to answer.
+            example: What is the gas price on Base right now?
+
+  - path: /gas-price
+    external_path: /v1/gas-price
+    method: GET
+    description: >
+      Current transaction fee level on a named EVM chain — median gas price
+      across an RPC quorum, plus EIP-1559 base and priority fees.
+    intents: [GAS_PRICE]
+    params:
+      query:
+        optional:
+          - name: chain
+            type: string
+            intents: [GAS_PRICE]
+            description: Chain name or id.
+            example: base
+          - name: query
+            type: string
+            intents: [GAS_PRICE]
+            description: Natural-language question, if chain is not supplied.
+            example: How much are gas fees on Arbitrum?
+
+  - path: /wallet-balance
+    external_path: /v1/wallet-balance
+    method: GET
+    description: Native-coin or ERC-20 balance for a wallet address on a named chain.
+    intents: [WALLET_BALANCE_CHECK]
+    params:
+      query:
+        optional:
+          - name: address
+            type: string
+            intents: [WALLET_BALANCE_CHECK]
+            description: 0x wallet address.
+            example: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+          - name: chain
+            type: string
+            intents: [WALLET_BALANCE_CHECK]
+            description: Chain name or id.
+            example: ethereum
+          - name: token
+            type: string
+            intents: [WALLET_BALANCE_CHECK]
+            description: ERC-20 contract address, for a token balance.
+          - name: query
+            type: string
+            intents: [WALLET_BALANCE_CHECK]
+            description: Natural-language question, if parameters are not supplied.
+            example: How much ETH does 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 hold?
+
+  - path: /token-holders
+    external_path: /v1/token-holders
+    method: GET
+    description: Number of distinct addresses holding an ERC-20 token.
+    intents: [TOKEN_HOLDER_COUNT]
+    params:
+      query:
+        optional:
+          - name: token
+            type: string
+            intents: [TOKEN_HOLDER_COUNT]
+            description: ERC-20 contract address.
+          - name: chain
+            type: string
+            intents: [TOKEN_HOLDER_COUNT]
+            description: Chain name or id.
+          - name: query
+            type: string
+            intents: [TOKEN_HOLDER_COUNT]
+            description: Natural-language question; well-known symbols are resolved automatically.
+            example: How many addresses hold USDC on Ethereum?
+
+  - path: /tvl
+    external_path: /v1/tvl
+    method: GET
+    description: Total value locked in USD for a DeFi protocol or an entire chain.
+    intents: [TVL_LOOKUP]
+    params:
+      query:
+        optional:
+          - name: protocol
+            type: string
+            intents: [TVL_LOOKUP]
+            description: DeFi protocol slug.
+            example: aave
+          - name: chain
+            type: string
+            intents: [TVL_LOOKUP]
+            description: Chain name, for whole-chain TVL.
+          - name: query
+            type: string
+            intents: [TVL_LOOKUP]
+            description: Natural-language question, if parameters are not supplied.
+            example: What is the total value locked in Aave?
+
+  - path: /tx
+    external_path: /v1/tx
+    method: GET
+    description: >
+      Details, status and effects of a specific transaction — success or
+      failure, block, value transferred, gas used and fee paid.
+    intents: [ONCHAIN_TX_LOOKUP]
+    params:
+      query:
+        optional:
+          - name: hash
+            type: string
+            intents: [ONCHAIN_TX_LOOKUP]
+            description: 0x transaction hash (64 hex characters).
+          - name: chain
+            type: string
+            intents: [ONCHAIN_TX_LOOKUP]
+            description: Chain name or id.
+          - name: query
+            type: string
+            intents: [ONCHAIN_TX_LOOKUP]
+            description: Natural-language question containing a transaction hash.
+            example: Did transaction 0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060 succeed?
+
+  - path: /price
+    external_path: /v1/price
+    method: GET
+    description: >
+      Current USD price of a crypto asset — the median of three independent
+      venues (DefiLlama, Coinbase, Binance), with the spread between them
+      reported and confidence reduced when they disagree.
+    intents: [CRYPTO_PRICE]
+    params:
+      query:
+        optional:
+          - name: symbol
+            type: string
+            intents: [CRYPTO_PRICE]
+            description: Asset ticker.
+            example: ETH
+          - name: token
+            type: string
+            intents: [CRYPTO_PRICE]
+            description: ERC-20 contract address, for long-tail tokens.
+          - name: chain
+            type: string
+            intents: [CRYPTO_PRICE]
+            description: Chain the token address belongs to.
+          - name: query
+            type: string
+            intents: [CRYPTO_PRICE]
+            description: Natural-language question, if parameters are not supplied.
+            example: What is the price of ETH?
+
+semantics:
+  signal_mapping:
+    label_field: signal
+    confidence_field: confidence
+    reason_field: signal
+  supported_intents:
+    - GAS_PRICE
+    - WALLET_BALANCE_CHECK
+    - TOKEN_HOLDER_COUNT
+    - TVL_LOOKUP
+    - ONCHAIN_TX_LOOKUP
+    - CRYPTO_PRICE
+
+on_chain:
+  description: Deterministic EVM network and market metrics, extracted directly from JSON responses.
+  transform: direct
+  min_price_usdc: 0.01
+  fields:
+    strings:
+      - index: 0
+        name: signal
+        source_path: signal
+        description: Concise number-first answer.
+      - index: 1
+        name: primary_value
+        source_path: data.primary_value
+        description: >
+          Headline figure as a decimal string. Every intent normalizes into this
+          one field: gas price in wei, balance in raw units, holder count, TVL in
+          USD, transaction value in wei, or price in USD.
+    integers:
+      - index: 0
+        name: chain_id
+        source_path: data.chain_id
+    bools:
+      - index: 0
+        name: ok
+        source_path: ok
+  request:
+    - endpoint: ask
+      method: GET
+      query_params:
+        query: { source: strings.0 }
+    - endpoint: gas-price
+      method: GET
+      query_params:
+        chain: { source: strings.0 }
+        query: { source: strings.1, optional: true }
+    - endpoint: wallet-balance
+      method: GET
+      query_params:
+        chain: { source: strings.0 }
+        address: { source: strings.1 }
+        token: { source: strings.2, optional: true }
+    - endpoint: token-holders
+      method: GET
+      query_params:
+        chain: { source: strings.0 }
+        token: { source: strings.1 }
+    - endpoint: tvl
+      method: GET
+      query_params:
+        protocol: { source: strings.0, optional: true }
+        chain: { source: strings.1, optional: true }
+    - endpoint: tx
+      method: GET
+      query_params:
+        chain: { source: strings.0 }
+        hash: { source: strings.1 }
+    - endpoint: price
+      method: GET
+      query_params:
+        symbol: { source: strings.0, optional: true }
+        chain: { source: strings.1, optional: true }
+        token: { source: strings.2, optional: true }

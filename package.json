@@ -1,0 +1,25 @@
+{
+  "name": "telegraph-onchain-miner",
+  "version": "2.0.0",
+  "description": "Telegraph Protocol miner: 6 canonical on-chain intents across 10 EVM chains, answering both explicit params and natural-language questions",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test",
+    "smoke": "bash scripts/smoke.sh",
+    "hash:yaml": "node scripts/hash-yaml.js",
+    "register": "node scripts/register.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "fastify": "^5.2.0"
+  },
+  "devDependencies": {
+    "viem": "^2.21.0"
+  },
+  "license": "MIT"
+}
