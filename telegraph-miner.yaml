@@ -33,7 +33,7 @@ description: >
   RPC quorum and asset prices the median of three independent venues, so a
   single stale or wicking source cannot move the answer.
 
-base_url: https://YOUR-DEPLOYMENT-URL.example.com
+base_url: https://telegraph-onchain-miner-production.up.railway.app
 
 auth:
   type: none
