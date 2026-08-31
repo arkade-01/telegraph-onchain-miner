@@ -5,12 +5,13 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "dev": "node --watch --env-file-if-exists=.env src/server.js",
     "test": "node --test",
     "smoke": "bash scripts/smoke.sh",
     "hash:yaml": "node scripts/hash-yaml.js",
-    "register": "node scripts/register.js"
+    "register": "node --env-file-if-exists=.env scripts/register.js",
+    "update": "node --env-file-if-exists=.env scripts/update.js"
   },
   "engines": {
     "node": ">=20"

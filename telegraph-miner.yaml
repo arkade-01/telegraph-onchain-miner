@@ -311,10 +311,12 @@ on_chain:
       - index: 0
         name: chain_id
         source_path: data.chain_id
+        description: EVM chain id the answer refers to.
     bools:
       - index: 0
         name: ok
         source_path: ok
+        description: True when the miner answered successfully.
   request:
     - endpoint: ask
       method: GET

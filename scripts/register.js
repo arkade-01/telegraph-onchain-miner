@@ -18,7 +18,11 @@ import { createWalletClient, createPublicClient, http, parseAbi } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { baseSepolia } from 'viem/chains';
 
-const DIAMOND = process.env.DIAMOND_ADDR || '0x122396E8602BEed349434AA6E83123E7dD97F5A0';
+// Base Sepolia Diamond, per docs.telegraphprotocol.com registration guide.
+// NOTE: 0x122396E8602BEed349434AA6E83123E7dD97F5A0 (the address in the older
+// GitBook page) is a stale deployment — transactions to it succeed but current
+// nodes do not watch it, so the registration is never seen.
+const DIAMOND = process.env.DIAMOND_ADDR || '0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8';
 const YAML_URL = process.env.YAML_URL;
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const MIN_PRICE = BigInt(process.env.MIN_PRICE || '10000'); // $0.01 USDC (6 decimals)
@@ -71,4 +75,8 @@ console.log(`tx sent: ${txHash}`);
 
 const receipt = await pub.waitForTransactionReceipt({ hash: txHash });
 console.log(`status: ${receipt.status} in block ${receipt.blockNumber}`);
-console.log('Miner staged — it activates at the next epoch boundary.');
+console.log('');
+console.log('Nodes activate on the registration event, usually within a minute —');
+console.log('there is no epoch boundary. Check status with:');
+console.log(`  curl -s https://devnode.telegraphprotocol.com/api/miners/<registrationId> | jq '.miner | {activation_status, rejection_reason}'`);
+console.log('The registrationId is in this transaction\'s MinerRegistered event.');
