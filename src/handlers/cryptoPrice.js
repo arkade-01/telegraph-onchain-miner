@@ -178,7 +178,7 @@ export async function cryptoPrice(req, reply) {
             source_count: 1
           },
           {
-            signal: `${fmtUsd(entry.price)} is the current price of ${entry.symbol || token} on ${chain.key}.`,
+            signal: `${entry.symbol || token} is ${fmtUsd(entry.price)} USD`,
             sources: [url],
             startedAt,
             // DefiLlama publishes its own confidence for address lookups
@@ -238,7 +238,8 @@ export async function cryptoPrice(req, reply) {
           quotes: good.map((g) => ({ price: g.price, source: new URL(g.source).host }))
         },
         {
-          signal: `${fmtUsd(med)} is the current price of ${sym.toUpperCase()}, the median of ${good.length} independent venue${good.length === 1 ? '' : 's'}.`,
+          // venue count is provenance, not the answer — it lives in `data`
+          signal: `${sym.toUpperCase()} is ${fmtUsd(med)} USD`,
           sources: good.map((g) => g.source),
           startedAt,
           confidence: Number(confidence.toFixed(3)),

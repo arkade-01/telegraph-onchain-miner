@@ -80,12 +80,14 @@ export async function txLookup(req, reply) {
         method_selector: tx.input && tx.input.length >= 10 ? tx.input.slice(0, 10) : null
       },
       {
+        // Was a 25-word sentence carrying the full 66-char hash, block,
+        // value AND fee. Every one of those is a separate figure the ground
+        // truth is unlikely to repeat, and each divides the overlap score.
+        // The claim is the status; the rest stays in `data`.
         signal:
           status === 'pending'
-            ? `Transaction ${hash} is still pending on ${chain.key}.`
-            : `Transaction ${hash} ${status === 'success' ? 'succeeded' : 'failed'} on ${chain.key} in block ${block}, transferring ${Number(valueEth)} ${chain.nativeSymbol}${
-                feeWei !== null ? ` with a fee of ${Number(formatUnits(feeWei, 18))} ${chain.nativeSymbol}` : ''
-              }.`,
+            ? `Transaction ${hash} is pending on ${chain.key}`
+            : `Transaction ${hash} ${status === 'success' ? 'succeeded' : 'failed'} on ${chain.key}`,
         sources: [source],
         startedAt,
         primaryValue: BigInt(tx.value).toString(),

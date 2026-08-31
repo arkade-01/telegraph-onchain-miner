@@ -58,15 +58,25 @@ export function fail(reply, code, message, intent, hint) {
   };
 }
 
-/** Compact number formatting for the human-readable signal string. */
+// Number formatting for `signal`.
+//
+// SCORING: the default scoring module compares our answer to a ground-truth
+// string word by word, dividing by OUR word count. Thousands separators are
+// pure downside — "9,026,572" can never match "9026572", and the comma buys
+// nothing. So these emit bare numbers: no commas, no B/M suffixes, no currency
+// symbol glued to the digits.
 export function fmtUsd(n) {
   const v = Number(n);
   if (!Number.isFinite(v)) return String(n);
-  if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
-  if (v >= 1e6) return `$${(v / 1e6).toFixed(2)}M`;
-  if (v >= 1e3) return `$${v.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
-  if (v >= 1) return `$${v.toFixed(2)}`;
-  return `$${v.toPrecision(4)}`;
+  // large values keep 2dp; small ones keep precision
+  return v >= 1 ? v.toFixed(2) : String(Number(v.toPrecision(6)));
 }
 
-export const fmtNum = (n) => Number(n).toLocaleString('en-US');
+export const fmtNum = (n) => String(Number(n));
+
+/** Trim a float for display without introducing separators. */
+export const fmtAmount = (n, maxDp = 6) => {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return String(n);
+  return String(Number(v.toFixed(maxDp)));
+};

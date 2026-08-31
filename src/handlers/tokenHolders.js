@@ -85,7 +85,7 @@ export async function tokenHolders(req, reply) {
               total_supply: body.total_supply ?? null
             },
             {
-              signal: `${fmtNum(n)} distinct addresses hold ${body.symbol || symbolForAddress(chain.key, token) || token} on ${chain.key}.`,
+              signal: `${fmtNum(n)} addresses hold ${body.symbol || symbolForAddress(chain.key, token) || token} on ${chain.key}`,
               sources: [url],
               startedAt,
               primaryValue: n,
@@ -109,7 +109,7 @@ export async function tokenHolders(req, reply) {
           'TOKEN_HOLDER_COUNT',
           { chain: chain.key, chain_id: chain.chainId, token, holder_count: n },
           {
-            signal: `${fmtNum(n)} distinct addresses hold ${symbolForAddress(chain.key, token) || token} on ${chain.key}.`,
+            signal: `${fmtNum(n)} addresses hold ${symbolForAddress(chain.key, token) || token} on ${chain.key}`,
             sources: ['https://api.etherscan.io/v2/api (tokenholdercount)'],
             startedAt,
             primaryValue: n,

@@ -7,7 +7,7 @@ import {
   rpcFirst, ethCall, abiAddress, SELECTORS,
   decodeUint, decodeString, formatUnits, isAddress
 } from '../rpc.js';
-import { ok, fail } from '../envelope.js';
+import { ok, fail, fmtAmount } from '../envelope.js';
 import { withCache } from '../cache.js';
 import { parseQuestion } from '../nlq.js';
 import { symbolForAddress } from '../tokens.js';
@@ -59,7 +59,7 @@ export async function walletBalance(req, reply) {
             balance: Number(bal)
           },
           {
-            signal: `${Number(bal).toLocaleString('en-US', { maximumFractionDigits: 6 })} ${chain.nativeSymbol} is the balance of ${address} on ${chain.key}.`,
+            signal: `${fmtAmount(bal)} ${chain.nativeSymbol} is the balance of ${address} on ${chain.key}`,
             sources: [source],
             startedAt,
             primaryValue: wei.toString(),
@@ -96,7 +96,7 @@ export async function walletBalance(req, reply) {
           balance: Number(human)
         },
         {
-          signal: `${Number(human).toLocaleString('en-US', { maximumFractionDigits: 6 })} ${symbol || 'tokens'} is the balance of ${address} on ${chain.key}.`,
+          signal: `${fmtAmount(human)} ${symbol || 'tokens'} is the balance of ${address} on ${chain.key}`,
           sources: [bal.source],
           startedAt,
           primaryValue: raw,

@@ -348,6 +348,53 @@ test('every response carries a signal, checks and confidence', async () => {
   }
 });
 
+// SCORING regression: the default scoring module divides matched words by OUR
+// word count, so every superfluous token in `signal` reduces the score. These
+// guard the trim — see src/envelope.js for the reasoning.
+
+test('signals carry no thousands separators', async () => {
+  const urls = [
+    `/v1/token-holders?chain=ethereum&token=${USDC}`,
+    '/v1/tvl?protocol=aave',
+    '/v1/price?symbol=eth',
+    `/v1/wallet-balance?chain=ethereum&address=${VITALIK}`
+  ];
+  for (const url of urls) {
+    const { signal } = (await app.inject({ url })).json();
+    assert.ok(
+      !/\d,\d/.test(signal),
+      `${url} -> "${signal}" contains a thousands separator, which can never word-match`
+    );
+  }
+});
+
+test('signals stay short and carry no parenthetical asides', async () => {
+  const urls = [
+    '/v1/gas-price?chain=ethereum',
+    `/v1/wallet-balance?chain=ethereum&address=${VITALIK}`,
+    `/v1/token-holders?chain=ethereum&token=${USDC}`,
+    '/v1/tvl?protocol=aave',
+    `/v1/tx?chain=ethereum&hash=0x${'c'.repeat(64)}`,
+    '/v1/price?symbol=eth'
+  ];
+  for (const url of urls) {
+    const { signal } = (await app.inject({ url })).json();
+    assert.ok(!signal.includes('('), `${url} -> "${signal}" has a parenthetical aside`);
+    const words = signal.trim().split(/\s+/).length;
+    assert.ok(words <= 10, `${url} -> "${signal}" is ${words} words; keep signals to one claim`);
+  }
+});
+
+test('the headline number appears verbatim in the signal', async () => {
+  // If the figure is formatted differently in `signal` than in `data`, a
+  // ground truth carrying the raw value cannot match it.
+  const body = (await app.inject({ url: '/v1/gas-price?chain=ethereum' })).json();
+  assert.ok(body.signal.includes(String(body.data.gas_price_gwei)), body.signal);
+
+  const holders = (await app.inject({ url: `/v1/token-holders?chain=ethereum&token=${USDC}` })).json();
+  assert.ok(holders.signal.includes(String(holders.data.holder_count)), holders.signal);
+});
+
 test('unparseable questions fail with a hint rather than a wrong answer', async () => {
   const res = await app.inject({ url: '/v1/wallet-balance?query=' + encodeURIComponent('how much does alice have') });
   assert.equal(res.statusCode, 400);

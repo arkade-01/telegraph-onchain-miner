@@ -66,7 +66,7 @@ export async function tvl(req, reply) {
         'TVL_LOOKUP',
         { protocol, tvl_usd: value },
         {
-          signal: `${fmtUsd(value)} is the current total value locked in ${protocol}.`,
+          signal: `${fmtUsd(value)} USD is the total value locked in ${protocol}`,
           sources: [url],
           startedAt,
           primaryValue: value,
@@ -90,7 +90,7 @@ export async function tvl(req, reply) {
       'TVL_LOOKUP',
       { chain: hit.name, tvl_usd: hit.tvl, token_symbol: hit.tokenSymbol ?? null },
       {
-        signal: `${fmtUsd(hit.tvl)} is the current total value locked on ${hit.name}.`,
+        signal: `${fmtUsd(hit.tvl)} USD is the total value locked on ${hit.name}`,
         sources: [url],
         startedAt,
         primaryValue: hit.tvl,

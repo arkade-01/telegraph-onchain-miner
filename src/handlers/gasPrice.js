@@ -73,9 +73,10 @@ export async function gasPrice(req, reply) {
           quorum_size: samples.length
         },
         {
-          signal: `${pretty} gwei is the current gas price on ${chain.key}${
-            baseFee !== null ? ` (base fee ${Number(formatUnits(baseFee, 9)).toFixed(4)} gwei)` : ''
-          }.`,
+          // One claim only. The base fee is a SECOND figure that the ground
+          // truth for "what is the gas price" will not contain, so including it
+          // could only dilute the word-overlap score. It stays in `data`.
+          signal: `${pretty} gwei is the gas price on ${chain.key}`,
           sources: samples.map((s) => s.url),
           startedAt,
           confidence: samples.length >= 2 ? 1 : 0.8,
