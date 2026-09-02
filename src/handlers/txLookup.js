@@ -80,14 +80,14 @@ export async function txLookup(req, reply) {
         method_selector: tx.input && tx.input.length >= 10 ? tx.input.slice(0, 10) : null
       },
       {
-        // Was a 25-word sentence carrying the full 66-char hash, block,
-        // value AND fee. Every one of those is a separate figure the ground
-        // truth is unlikely to repeat, and each divides the overlap score.
-        // The claim is the status; the rest stays in `data`.
+        // Same reasoning as wallet balances: a 66-character hex hash is a
+        // long digit-bearing token that a number-extracting scorer can trip
+        // over. The hash identifies the question, not the answer, so it stays
+        // in `data.hash` and the signal states the outcome only.
         signal:
           status === 'pending'
-            ? `Transaction ${hash} is pending on ${chain.key}`
-            : `Transaction ${hash} ${status === 'success' ? 'succeeded' : 'failed'} on ${chain.key}`,
+            ? `The transaction is pending on ${chain.key}`
+            : `The transaction ${status === 'success' ? 'succeeded' : 'failed'} on ${chain.key}`,
         sources: [source],
         startedAt,
         primaryValue: BigInt(tx.value).toString(),

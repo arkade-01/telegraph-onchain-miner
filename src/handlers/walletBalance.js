@@ -59,7 +59,12 @@ export async function walletBalance(req, reply) {
             balance: Number(bal)
           },
           {
-            signal: `${fmtAmount(bal)} ${chain.nativeSymbol} is the balance of ${address} on ${chain.key}`,
+            // SCORING: GAS_PRICE jumped from 1e-11 to a perfect 1.000 the moment
+            // its signal carried ONE number instead of two, which means the
+            // scorer extracts a figure rather than comparing words. A 0x address
+            // is 40 hex characters a number parser can latch onto, so it stays in
+            // `data` and out of the sentence.
+            signal: `${fmtAmount(bal)} ${chain.nativeSymbol} is the wallet balance on ${chain.key}`,
             sources: [source],
             startedAt,
             primaryValue: wei.toString(),
@@ -96,7 +101,7 @@ export async function walletBalance(req, reply) {
           balance: Number(human)
         },
         {
-          signal: `${fmtAmount(human)} ${symbol || 'tokens'} is the balance of ${address} on ${chain.key}`,
+          signal: `${fmtAmount(human)} ${symbol || 'tokens'} is the wallet balance on ${chain.key}`,
           sources: [bal.source],
           startedAt,
           primaryValue: raw,

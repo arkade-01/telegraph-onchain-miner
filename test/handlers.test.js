@@ -352,6 +352,57 @@ test('every response carries a signal, checks and confidence', async () => {
 // word count, so every superfluous token in `signal` reduces the score. These
 // guard the trim — see src/envelope.js for the reasoning.
 
+test('a signal carries at most one number, and it is the answer', async () => {
+  // Derived from a live result, not a guess: GAS_PRICE scored 0.000000000012
+  // while its signal held two figures (the price AND the base fee), then hit a
+  // perfect 1.000 the epoch after the second figure was removed. Eleven orders
+  // of magnitude is not a word-overlap response — the scorer extracts a number.
+  // So exactly one numeric token may appear, and it must be the headline value.
+  const cases = [
+    ['/v1/gas-price?chain=ethereum', (b) => b.data.gas_price_gwei],
+    [`/v1/wallet-balance?chain=ethereum&address=${VITALIK}`, (b) => b.data.balance],
+    [`/v1/token-holders?chain=ethereum&token=${USDC}`, (b) => b.data.holder_count],
+    ['/v1/tvl?protocol=aave', (b) => b.data.tvl_usd],
+    ['/v1/price?symbol=eth', (b) => b.data.price_usd],
+    [`/v1/tx?chain=ethereum&hash=0x${'c'.repeat(64)}`, null] // status answer, no figure
+  ];
+
+  for (const [url, expected] of cases) {
+    const body = (await app.inject({ url })).json();
+    const numeric = body.signal.split(/\s+/).filter((t) => /\d/.test(t));
+
+    assert.ok(
+      numeric.length <= 1,
+      `${url} -> "${body.signal}" carries ${numeric.length} numeric tokens: ${JSON.stringify(numeric)}`
+    );
+
+    if (expected) {
+      assert.equal(numeric.length, 1, `${url} must state its figure`);
+      // the one number present has to be the answer, not an id or a hash
+      assert.ok(
+        numeric[0].includes(String(expected(body))) || String(expected(body)).includes(numeric[0].replace(/[^\d.]/g, '')),
+        `${url} -> "${body.signal}" states ${numeric[0]} but the answer is ${expected(body)}`
+      );
+    }
+  }
+});
+
+test('no 0x identifiers leak into signals', async () => {
+  // Addresses and tx hashes are digit-bearing tokens a number parser can latch
+  // onto. They identify the question, not the answer, so they belong in `data`.
+  const urls = [
+    `/v1/wallet-balance?chain=ethereum&address=${VITALIK}`,
+    `/v1/wallet-balance?chain=ethereum&address=${VITALIK}&token=${USDC}`,
+    `/v1/tx?chain=ethereum&hash=0x${'c'.repeat(64)}`
+  ];
+  for (const url of urls) {
+    const { signal, data } = (await app.inject({ url })).json();
+    assert.ok(!/0x[0-9a-fA-F]{8,}/.test(signal), `${url} -> "${signal}" contains a 0x identifier`);
+    // ...but it must still be in the structured payload
+    assert.ok(data.address || data.hash, `${url} must keep the identifier in data`);
+  }
+});
+
 test('signals carry no thousands separators', async () => {
   const urls = [
     `/v1/token-holders?chain=ethereum&token=${USDC}`,
